@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demande d'acompte sur salaire – Edgard Opticiens</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --primary:#111111;
+    --accent:#B0894C;
+    --bullet:#B0894C;
+    --ink:#1d1d1d;
+    --muted:#666;
+    --line:#bdbdbd;
+    --paper:#ffffff;
+    --bg:#eceef0;
+    --err:#b91c1c;
+    --errbg:#fde8e8;
+    --ok:#0f7a3d;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:'Inter', -apple-system, Segoe UI, Roboto, sans-serif;
+    color:var(--ink);
+    background:var(--bg);
+    -webkit-font-smoothing:antialiased;
+    line-height:1.45;
+  }
+  .wrap{max-width:880px;margin:0 auto;padding:18px 14px 140px}
+
+  /* Barre rôle */
+  .toolbar{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    margin:0 auto 14px;max-width:794px;
+  }
+  .badge{
+    display:inline-flex;align-items:center;gap:8px;
+    background:var(--primary);color:#fff;font-weight:600;font-size:13px;
+    padding:7px 14px;border-radius:999px;
+  }
+  .badge .dot{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+  .steps{display:flex;gap:6px;flex-wrap:wrap;font-size:11px;color:var(--muted)}
+  .steps span{padding:3px 9px;border-radius:999px;background:#fff;border:1px solid #e0e0e0}
+  .steps span.on{background:var(--primary);color:#fff;border-color:var(--primary);font-weight:600}
+  .steps span.done{color:var(--ok);border-color:var(--ok)}
+  .reset{margin-left:auto;background:none;border:1px solid #d4d4d4;color:var(--muted);
+    font-size:12px;padding:6px 12px;border-radius:8px;cursor:pointer}
+  .reset:hover{border-color:#999;color:#333}
+
+  /* Feuille A4 */
+  .sheet-scroll{overflow-x:auto;margin:0 auto;max-width:100%}
+  #doc{
+    width:794px;min-height:1123px;margin:0 auto;background:var(--paper);
+    padding:34px 40px 40px;
+    box-shadow:0 8px 30px rgba(0,0,0,.12);
+    border-radius:4px;
+  }
+
+  /* En-tête : grille 3 colonnes -> titre parfaitement centré */
+  .head{display:grid;grid-template-columns:172px 1fr 172px;align-items:center;gap:16px;margin-bottom:24px}
+  .brand{width:172px;height:66px;display:flex;align-items:center}
+  .brand svg{width:100%;height:auto;max-height:66px}
+  .brand-spacer{width:172px}
+  .title-box{
+    justify-self:center;text-align:center;
+    border:2px solid var(--primary);border-radius:10px;
+    padding:12px 22px;background:#fff;
+  }
+  .title-box h1{
+    margin:0;font-family:'Playfair Display', Georgia, serif;
+    font-size:17px;letter-spacing:.04em;font-weight:700;color:var(--primary);
+    text-transform:uppercase;
+  }
+
+  /* Cartes (boîtes arrondies du formulaire) */
+  .card{border:2px solid var(--primary);border-radius:14px;padding:20px 22px;margin-bottom:20px;background:#fff}
+
+  /* Corps de la demande */
+  .intro p{margin:0 0 16px;font-size:14.5px}
+  .fill{display:inline-flex;align-items:baseline;gap:0}
+  /* Champs en ligne façon pointillés */
+  input.line{
+    font:inherit;color:var(--ink);border:none;border-bottom:1.5px dotted var(--line);
+    background:transparent;padding:1px 4px;min-width:60px;outline:none;
+  }
+  input.line:focus{border-bottom-color:var(--primary);background:rgba(0,0,0,.02)}
+  input.line:read-only,input.line:disabled{border-bottom-style:solid;border-bottom-color:#e3e3e3;color:#222}
+  /* Société : menu déroulant stylé comme un champ en ligne */
+  select.sel-line{
+    font:inherit;color:var(--ink);border:none;border-bottom:1.5px dotted var(--line);
+    background:transparent;padding:1px 22px 2px 4px;outline:none;min-width:170px;cursor:pointer;
+    -webkit-appearance:none;appearance:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%23999'/></svg>");
+    background-repeat:no-repeat;background-position:right 4px center;background-size:9px;
+  }
+  select.sel-line:focus{border-bottom-color:var(--primary);background-color:rgba(0,0,0,.02)}
+  select.sel-line:disabled{border-bottom-style:solid;border-bottom-color:#e3e3e3;color:#222;background-image:none;opacity:1}
+  .print-only{display:none;border-bottom:1.5px solid #e3e3e3;padding:1px 4px}
+  .grow{flex:1}
+  .w-nom{width:100%}
+  .w-soc{width:100%}
+  .w-mt{width:170px}
+  .w-mois{width:150px}
+  .w-an{width:54px;text-align:center}
+
+  .notes{margin-top:6px}
+  .notes .nt-title{font-weight:700;font-size:13.5px;background:#efefef;padding:4px 8px;border-radius:4px;display:inline-block;margin-bottom:10px}
+  .notes ul{list-style:none;margin:0;padding:0}
+  .notes li{position:relative;padding-left:20px;margin-bottom:9px;font-size:12.5px;color:#2a2a2a;text-align:justify}
+  .notes li:before{content:"";position:absolute;left:0;top:4px;width:9px;height:9px;background:var(--bullet)}
+
+  /* Validation : 2 colonnes */
+  .sec-title{text-align:center;font-weight:700;font-size:13.5px;background:#efefef;
+    padding:5px;border-radius:4px;margin:-2px -2px 16px;text-decoration:underline}
+  .cols{display:flex;gap:24px}
+  .col{flex:1;text-align:center}
+  .col .role{font-weight:700;font-size:14px}
+  .col .sub{font-size:11.5px;color:var(--muted);margin-top:1px}
+  .date-row{margin-top:14px;font-size:12px}
+  .date-row label{display:block;color:#333;margin-bottom:3px}
+  input.date{
+    font:inherit;text-align:center;width:120px;border:none;border-bottom:1.5px dotted var(--line);
+    background:transparent;padding:2px;outline:none;
+  }
+  input.date:focus{border-bottom-color:var(--primary)}
+  input.date:disabled{border-bottom-style:solid;border-bottom-color:#e3e3e3;color:#222}
+
+  /* Signatures */
+  .sig-wrap{margin-top:10px}
+  .sig-label{font-size:12px;color:#333;margin-bottom:4px}
+  .sig-pad{position:relative;width:100%;max-width:280px;margin:0 auto;height:96px;
+    border:1.5px dashed #cfcfcf;border-radius:8px;background:#fcfcfc;touch-action:none}
+  .sig-pad.active{border-color:var(--primary);background:#fff}
+  .sig-pad.signed{border-style:solid;border-color:#e3e3e3;background:#fff}
+  .sig-pad svg{width:100%;height:100%;display:block}
+  .sig-pad .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    color:#bbb;font-size:11px;pointer-events:none}
+  .sig-clear{display:block;margin:6px auto 0;font-size:11px;color:var(--muted);
+    background:none;border:1px solid #ddd;border-radius:6px;padding:3px 10px;cursor:pointer}
+  .sig-clear:hover{border-color:#aaa}
+
+  /* Cadre RH */
+  .rh .rh-row{font-size:12.5px;margin-bottom:12px;display:flex;flex-wrap:wrap;align-items:baseline;gap:6px}
+  .rh .rh-row b{font-weight:600}
+  .rh-grid-sig{margin-top:8px;display:flex;justify-content:flex-end}
+  .rh-grid-sig .col{flex:0 0 280px}
+
+  /* Barre d'action */
+  .actionbar{
+    position:fixed;left:0;right:0;bottom:0;z-index:40;
+    background:#fff;border-top:1px solid #e2e2e2;
+    box-shadow:0 -6px 18px rgba(0,0,0,.06);
+    padding:12px 14px;
+  }
+  .actionbar .inner{max-width:794px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+  .error{display:none;background:var(--errbg);color:var(--err);border:1px solid #f3b4b4;
+    border-radius:8px;padding:9px 12px;font-size:13px}
+  .error.show{display:block}
+  .error ul{margin:6px 0 0;padding-left:18px}
+  .resp-field{display:none;align-items:center;gap:8px;flex-wrap:wrap}
+  .resp-field.show{display:flex}
+  .resp-field label{font-size:13px;font-weight:600}
+  .resp-field input{flex:1;min-width:200px;padding:9px 11px;border:1px solid #d4d4d4;border-radius:8px;font:inherit}
+  .row-btns{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .btn{font:inherit;font-weight:600;font-size:14.5px;border:none;border-radius:10px;
+    padding:12px 22px;cursor:pointer;background:var(--primary);color:#fff}
+  .btn:hover{filter:brightness(.94)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn.ghost{background:#fff;color:var(--primary);border:1.5px solid var(--primary)}
+  .hint{font-size:12px;color:var(--muted)}
+
+  /* Modal lien */
+  .modal{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.45);display:none;
+    align-items:center;justify-content:center;padding:18px}
+  .modal.show{display:flex}
+  .modal .box{background:#fff;border-radius:14px;max-width:460px;width:100%;padding:22px}
+  .modal h3{margin:0 0 6px;font-family:'Playfair Display', Georgia, serif;color:var(--primary);font-size:18px}
+  .modal p{margin:0 0 14px;font-size:13px;color:#444}
+  .linkbox{display:flex;gap:8px}
+  .linkbox input{flex:1;padding:9px 11px;border:1px solid #d4d4d4;border-radius:8px;font-size:12px;background:#f7f7f7}
+  .modal .acts{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+  .copied{font-size:12px;color:var(--ok);margin-top:8px;display:none}
+  .copied.show{display:block}
+
+  /* Export */
+  #doc.exporting input.line,#doc.exporting input.date{border-bottom-color:transparent}
+  #doc.exporting select.sel-line{display:none}
+  #doc.exporting .print-only{display:inline}
+  #doc.exporting .sig-pad{border-color:transparent;background:#fff}
+  #doc.exporting .sig-clear{display:none}
+  #doc.exporting .ph{display:none}
+
+  @media(max-width:840px){
+    .wrap{padding-left:8px;padding-right:8px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="toolbar">
+    <span class="badge"><span class="dot"></span><span id="roleLabel">Collaborateur</span></span>
+    <div class="steps" id="steps">
+      <span data-s="collab">1. Collaborateur</span>
+      <span data-s="resp">2. Responsable</span>
+      <span data-s="dir">3. Direction</span>
+      <span data-s="rh">4. Service RH</span>
+    </div>
+    <button class="reset" id="resetBtn" type="button">Nouvelle demande</button>
+  </div>
+
+  <div class="sheet-scroll">
+  <div id="doc">
+
+    <div class="head">
+      <!-- LOGO : remplaçable par <img src="URL_DU_LOGO" style="width:100%"> -->
+      <div class="brand"><svg viewBox="0 0 172 60" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Edgard Opticiens"><text x="86" y="30" text-anchor="middle" font-family="Playfair Display, Georgia, serif" font-size="27" font-weight="700" letter-spacing="2" fill="#111">EDGARD</text><line x1="34" y1="40" x2="138" y2="40" stroke="#B0894C" stroke-width="1.2"/><text x="86" y="53" text-anchor="middle" font-family="Inter, sans-serif" font-size="9" letter-spacing="6" fill="#B0894C">OPTICIENS</text></svg></div>
+      <div class="title-box"><h1>Demande d'acompte sur salaire</h1></div>
+      <div class="brand-spacer" aria-hidden="true"></div>
+    </div>
+
+    <div class="card intro">
+      <p class="fill"><span>Je, soussigné(e),&nbsp;</span><input class="line w-nom grow" id="f_nom" placeholder="Nom et prénom" autocomplete="off"></p>
+      <p class="fill"><span>salarié(e) de la société&nbsp;</span><select class="sel-line grow" id="f_societe"><option value="">— Sélectionnez —</option><option>Edgard Développement</option><option>Ango</option><option>Biarro</option><option>Bordo</option><option>Caenpo</option><option>Giro</option><option>Havro</option><option>Jisam</option><option>Lyono</option><option>Manso</option><option>Marseillo</option><option>Nanceo</option><option>Nanto</option><option>Niceo</option><option>Orlo</option><option>Reimo</option><option>Strabo</option><option>Turo</option></select><span class="print-only" id="f_societe_print"></span></p>
+      <p class="fill"><span>sollicite le versement d'un acompte de&nbsp;</span><input class="line w-mt" id="f_montant" placeholder="montant" inputmode="decimal" autocomplete="off"><span>&nbsp;euros,</span></p>
+      <p class="fill"><span>sur mon salaire du mois de&nbsp;</span><input class="line w-mois" id="f_mois" placeholder="mois" autocomplete="off"><span>&nbsp;20</span><input class="line w-an" id="f_annee" placeholder="26" maxlength="2" inputmode="numeric" autocomplete="off"><span>&nbsp;.</span></p>
+
+      <div class="notes">
+        <span class="nt-title">J'ai pris note que :</span>
+        <ul>
+          <li>Cette somme ne peut excéder la moitié de mon salaire (net) mensuel (Art L3242-1, alinéa 3 du Code du Travail) ou la rémunération acquise en contrepartie du travail effectivement accompli à la date de la demande.</li>
+          <li>Le montant de cet acompte sera porté en déduction sur mon salaire du mois de la demande.</li>
+          <li>Le versement de cet acompte sera effectué par virement sur mon compte bancaire à partir du 15 du mois de la demande.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="sec-title">Validation de la demande</div>
+      <div class="cols">
+        <div class="col">
+          <div class="role">Salarié(e)</div>
+          <div class="sub">&nbsp;</div>
+          <div class="date-row"><label>Date</label><input class="date" id="f_dateCollab" placeholder="jj/mm/aaaa" autocomplete="off"></div>
+          <div class="sig-wrap">
+            <div class="sig-label">Signature</div>
+            <div class="sig-pad" id="pad_collab"><span class="ph">Signez ici</span></div>
+            <button class="sig-clear" type="button" data-clear="collab">Effacer</button>
+          </div>
+        </div>
+        <div class="col">
+          <div class="role">Responsable hiérarchique</div>
+          <div class="sub">(à titre d'information)</div>
+          <div class="date-row"><label>Date</label><input class="date" id="f_dateResp" placeholder="jj/mm/aaaa" autocomplete="off"></div>
+          <div class="sig-wrap">
+            <div class="sig-label">Signature</div>
+            <div class="sig-pad" id="pad_resp"><span class="ph">Signez ici</span></div>
+            <button class="sig-clear" type="button" data-clear="resp">Effacer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card rh">
+      <div class="sec-title">Cadre réservé au service RH</div>
+      <div class="rh-row">
+        <b>Reçu service RH le :</b>
+        <input class="date" id="f_recuLe" placeholder="jj/mm/aaaa" autocomplete="off">
+        <b>&nbsp;&nbsp;déblocage / virement le :</b>
+        <input class="date" id="f_deblocageLe" placeholder="jj/mm/aaaa" autocomplete="off">
+      </div>
+      <div class="rh-row">
+        <b>Reprise sur paie du mois de :</b>
+        <input class="date" id="f_repriseMois" placeholder="mm/aaaa" autocomplete="off">
+      </div>
+      <div class="rh-grid-sig">
+        <div class="col">
+          <div class="role" style="font-size:13px">Signature du dirigeant</div>
+          <div class="date-row"><label>Date</label><input class="date" id="f_dateDir" placeholder="jj/mm/aaaa" autocomplete="off"></div>
+          <div class="sig-wrap">
+            <div class="sig-pad" id="pad_dir"><span class="ph">Signez ici</span></div>
+            <button class="sig-clear" type="button" data-clear="dir">Effacer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  </div>
+</div>
+
+<div class="actionbar">
+  <div class="inner">
+    <div class="error" id="errBox"></div>
+    <div class="resp-field" id="respField">
+      <label for="respEmail">Email du responsable hiérarchique</label>
+      <input id="respEmail" type="email" placeholder="prenom.nom@groupe-edgard.com" autocomplete="off">
+    </div>
+    <div class="row-btns">
+      <button class="btn" id="primaryBtn" type="button">Envoyer au responsable</button>
+      <span class="hint" id="actionHint"></span>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modal">
+  <div class="box">
+    <h3 id="modalTitle">Lien généré</h3>
+    <p id="modalText">Transmettez ce lien à l'étape suivante.</p>
+    <div class="linkbox">
+      <input id="modalLink" readonly>
+      <button class="btn ghost" id="copyBtn" type="button">Copier</button>
+    </div>
+    <div class="copied" id="copiedMsg">Lien copié.</div>
+    <div class="acts">
+      <button class="btn" id="mailBtn" type="button">Ouvrir l'email</button>
+      <button class="btn ghost" id="closeModal" type="button">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ---------- Config workflow ---------- */
+var DIR_EMAIL = "j.deruy@groupe-edgard.com";          // Direction
+var RH_EMAIL  = "ressources-humaines@groupe-edgard.com"; // Service RH
+var ORDER = ["collab","resp","dir","rh"];
+var STEP_LABEL = {collab:"Collaborateur", resp:"Responsable hiérarchique", dir:"Direction", rh:"Service RH"};
+
+/* ---------- Etat ---------- */
+var S = {
+  nom:"", societe:"", montant:"", mois:"", annee:"",
+  dateCollab:"", dateResp:"", dateDir:"",
+  recuLe:"", deblocageLe:"", repriseMois:"",
+  sigCollab:null, sigResp:null, sigDir:null,
+  step:"collab"
+};
+
+/* ---------- Signature pads (SVG, compat iOS) ---------- */
+function SigPad(id){
+  this.id=id;
+  this.host=document.getElementById("pad_"+id);
+  this.strokes=[];
+  this.cur=null;
+  this.editable=false;
+  this.svg=document.createElementNS("http://www.w3.org/2000/svg","svg");
+  this.svg.setAttribute("viewBox","0 0 600 200");
+  this.svg.setAttribute("preserveAspectRatio","none");
+  this.host.appendChild(this.svg);
+  this.ph=this.host.querySelector(".ph");
+  var self=this;
+  this.host.addEventListener("pointerdown",function(e){self.down(e);});
+  this.host.addEventListener("pointermove",function(e){self.move(e);});
+  window.addEventListener("pointerup",function(){self.up();});
+  this.host.addEventListener("pointerleave",function(){self.up();});
+}
+SigPad.prototype.pt=function(e){
+  var r=this.host.getBoundingClientRect();
+  var x=Math.round((e.clientX-r.left)/r.width*600);
+  var y=Math.round((e.clientY-r.top)/r.height*200);
+  return [Math.max(0,Math.min(600,x)),Math.max(0,Math.min(200,y))];
+};
+SigPad.prototype.down=function(e){
+  if(!this.editable) return;
+  e.preventDefault();
+  this.cur=this.pt(e); this.curStroke=[this.cur[0],this.cur[1]];
+  this.host.setPointerCapture && this.host.setPointerCapture(e.pointerId);
+};
+SigPad.prototype.move=function(e){
+  if(!this.editable||!this.cur) return;
+  e.preventDefault();
+  var p=this.pt(e);
+  this.curStroke.push(p[0],p[1]);
+  this.cur=p;
+  this.render(true);
+};
+SigPad.prototype.up=function(){
+  if(this.curStroke && this.curStroke.length>=2){
+    this.strokes.push(this.curStroke);
+    this.persist();
+  }
+  this.curStroke=null; this.cur=null;
+};
+SigPad.prototype.persist=function(){
+  S["sig"+cap(this.id)] = this.strokes.length?JSON.stringify(this.strokes):null;
+  this.render(false);
+};
+SigPad.prototype.render=function(live){
+  var all=this.strokes.slice();
+  if(live&&this.curStroke) all=all.concat([this.curStroke]);
+  var d="";
+  for(var i=0;i<all.length;i++){
+    var s=all[i];
+    if(s.length<2) continue;
+    d+="M"+s[0]+" "+s[1];
+    for(var j=2;j<s.length;j+=2){ d+=" L"+s[j]+" "+s[j+1]; }
+  }
+  this.svg.innerHTML = d?('<path d="'+d+'" fill="none" stroke="#10243f" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>'):"";
+  var has=all.length>0;
+  this.ph.style.display = has?"none":"";
+  this.host.classList.toggle("signed", has && !this.editable);
+};
+SigPad.prototype.load=function(json){
+  try{ this.strokes = json?JSON.parse(json):[]; }catch(e){ this.strokes=[]; }
+  this.render(false);
+};
+SigPad.prototype.clear=function(){
+  this.strokes=[]; this.curStroke=null; this.cur=null;
+  this.persist(); this.render(false);
+};
+SigPad.prototype.setEditable=function(b){
+  this.editable=b;
+  this.host.classList.toggle("active", b && this.strokes.length===0);
+};
+function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
+
+var pads={ collab:new SigPad("collab"), resp:new SigPad("resp"), dir:new SigPad("dir") };
+
+/* ---------- Helpers DOM ---------- */
+function $(id){return document.getElementById(id);}
+var FIELDS=["nom","societe","montant","mois","annee","dateCollab","dateResp","dateDir","recuLe","deblocageLe","repriseMois"];
+function readForm(){
+  FIELDS.forEach(function(k){ S[k]=$("f_"+k).value.trim(); });
+}
+function fillForm(){
+  FIELDS.forEach(function(k){ $("f_"+k).value = S[k]||""; });
+  updateSocietePrint();
+  pads.collab.load(S.sigCollab);
+  pads.resp.load(S.sigResp);
+  pads.dir.load(S.sigDir);
+}
+function updateSocietePrint(){
+  $("f_societe_print").textContent = $("f_societe").value || "";
+}
+
+/* ---------- Dates ---------- */
+function today(){
+  var d=new Date(), p=function(n){return (n<10?"0":"")+n;};
+  return p(d.getDate())+"/"+p(d.getMonth()+1)+"/"+d.getFullYear();
+}
+function validDate(v){ return /^\d{2}\/\d{2}\/\d{4}$/.test(v); }
+function validMonth(v){ return /^\d{2}\/\d{4}$/.test(v); }
+
+/* ---------- Etat <-> URL ---------- */
+function encodeState(){
+  readForm();
+  var json=JSON.stringify(S);
+  return LZString.compressToEncodedURIComponent(json);
+}
+function loadFromHash(){
+  var h=location.hash.replace(/^#/,"");
+  if(!h) return false;
+  try{
+    var json=LZString.decompressFromEncodedURIComponent(h);
+    if(!json) return false;
+    var obj=JSON.parse(json);
+    Object.keys(obj).forEach(function(k){ S[k]=obj[k]; });
+    return true;
+  }catch(e){ return false; }
+}
+
+/* ---------- Application de l'étape ---------- */
+function applyStep(){
+  var step=S.step;
+  $("roleLabel").textContent = STEP_LABEL[step];
+  // steps tracker
+  var idx=ORDER.indexOf(step);
+  document.querySelectorAll("#steps span").forEach(function(el){
+    var i=ORDER.indexOf(el.getAttribute("data-s"));
+    el.classList.toggle("on", i===idx);
+    el.classList.toggle("done", i<idx);
+  });
+
+  var editCollab=(step==="collab"), editResp=(step==="resp"),
+      editDir=(step==="dir"), editRh=(step==="rh");
+
+  // Champs collaborateur
+  ["nom","montant","mois","annee"].forEach(function(k){ $("f_"+k).readOnly=!editCollab; });
+  $("f_societe").disabled=!editCollab;
+  $("f_dateCollab").readOnly=!editCollab; $("f_dateCollab").disabled=!editCollab;
+  // dates
+  $("f_dateResp").readOnly=!editResp; $("f_dateResp").disabled=!editResp;
+  $("f_dateDir").readOnly=!editDir;   $("f_dateDir").disabled=!editDir;
+  ["recuLe","deblocageLe","repriseMois"].forEach(function(k){
+    $("f_"+k).readOnly=!editRh; $("f_"+k).disabled=!editRh;
+  });
+
+  pads.collab.setEditable(editCollab);
+  pads.resp.setEditable(editResp);
+  pads.dir.setEditable(editDir);
+
+  // pré-remplissage date du jour à l'arrivée de l'acteur
+  if(editCollab && !$("f_dateCollab").value) $("f_dateCollab").value=today();
+  if(editResp && !$("f_dateResp").value) $("f_dateResp").value=today();
+  if(editDir && !$("f_dateDir").value) $("f_dateDir").value=today();
+  if(editRh && !$("f_recuLe").value) $("f_recuLe").value=today();
+
+  // bouton + champ responsable
+  $("respField").classList.toggle("show", editCollab);
+  var btn=$("primaryBtn");
+  var hint=$("actionHint");
+  if(editCollab){ btn.textContent="Envoyer au responsable"; hint.textContent=""; }
+  else if(editResp){ btn.textContent="Envoyer à la direction"; hint.textContent="Destinataire : "+DIR_EMAIL; }
+  else if(editDir){ btn.textContent="Envoyer au service RH"; hint.textContent="Destinataire : "+RH_EMAIL; }
+  else if(editRh){ btn.textContent="Exporter le PDF"; hint.textContent="Complétez les dates puis générez le PDF définitif."; }
+}
+
+/* ---------- Validation ---------- */
+function showErr(list){
+  var box=$("errBox");
+  if(!list||!list.length){ box.classList.remove("show"); box.innerHTML=""; return false; }
+  box.innerHTML="<strong>Merci de compléter :</strong><ul><li>"+list.join("</li><li>")+"</li></ul>";
+  box.classList.add("show");
+  box.scrollIntoView({behavior:"smooth",block:"nearest"});
+  return true;
+}
+function validateCollab(){
+  readForm(); var e=[];
+  if(!S.nom) e.push("Nom et prénom");
+  if(!S.societe) e.push("Société");
+  if(!S.montant) e.push("Montant de l'acompte");
+  if(!S.mois) e.push("Mois du salaire");
+  if(!S.annee || S.annee.length<2) e.push("Année (2 chiffres)");
+  if(!validDate(S.dateCollab)) e.push("Date (format jj/mm/aaaa)");
+  if(!S.sigCollab) e.push("Signature du salarié");
+  var email=$("respEmail").value.trim();
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) e.push("Email du responsable hiérarchique");
+  return e;
+}
+function validateResp(){
+  readForm(); var e=[];
+  if(!validDate(S.dateResp)) e.push("Date (format jj/mm/aaaa)");
+  if(!S.sigResp) e.push("Signature du responsable");
+  return e;
+}
+function validateDir(){
+  readForm(); var e=[];
+  if(!validDate(S.dateDir)) e.push("Date (format jj/mm/aaaa)");
+  if(!S.sigDir) e.push("Signature du dirigeant");
+  return e;
+}
+function validateRh(){
+  readForm(); var e=[];
+  if(!validDate(S.recuLe)) e.push("Date de réception RH (jj/mm/aaaa)");
+  if(!validDate(S.deblocageLe)) e.push("Date de déblocage / virement (jj/mm/aaaa)");
+  if(!validMonth(S.repriseMois)) e.push("Mois de reprise sur paie (mm/aaaa)");
+  return e;
+}
+
+/* ---------- Lien court ---------- */
+function shorten(longUrl){
+  return fetch("https://is.gd/create.php?format=simple&logstats=0&url="+encodeURIComponent(longUrl))
+    .then(function(r){ return r.ok?r.text():Promise.reject(); })
+    .then(function(t){ t=(t||"").trim(); if(t.indexOf("http")===0) return t; throw 0; })
+    .catch(function(){
+      return fetch("https://tinyurl.com/api-create.php?url="+encodeURIComponent(longUrl))
+        .then(function(r){ return r.ok?r.text():Promise.reject(); })
+        .then(function(t){ t=(t||"").trim(); if(t.indexOf("http")===0) return t; throw 0; })
+        .catch(function(){ return longUrl; });
+    });
+}
+
+/* ---------- Modal / mailto ---------- */
+function buildLongUrl(nextStep){
+  S.step=nextStep;
+  var base=location.href.split("#")[0];
+  return base+"#"+encodeState();
+}
+function openHandoff(nextStep, to, who){
+  var longUrl=buildLongUrl(nextStep);
+  var btn=$("primaryBtn"); btn.disabled=true; btn.textContent="Génération du lien…";
+  shorten(longUrl).then(function(link){
+    var subject="Demande d'acompte sur salaire – "+S.nom+(S.societe?(" ("+S.societe+")"):"");
+    var body=mailBody(nextStep, link);
+    $("modalTitle").textContent="Lien pour "+who;
+    $("modalText").textContent="Transmettez ce lien à "+who+". Il rouvre la demande à l'étape suivante.";
+    $("modalLink").value=link;
+    $("mailBtn").onclick=function(){
+      window.location.href="mailto:"+(to||"")+"?subject="+encodeURIComponent(subject)+"&body="+encodeURIComponent(body);
+    };
+    $("modal").classList.add("show");
+    btn.disabled=false; applyStep();
+  });
+}
+function mailBody(nextStep, link){
+  var l="\n"+link+"\n\n";
+  if(nextStep==="resp")
+    return "Bonjour,\n\nUn(e) collaborateur(trice) ("+S.nom+") a déposé une demande d'acompte sur salaire et sollicite votre validation.\n"+l+"Merci d'ouvrir le lien, de signer, puis de transmettre à la direction.\n\nCordialement,";
+  if(nextStep==="dir")
+    return "Bonjour,\n\nLa demande d'acompte de "+S.nom+" a été validée par le responsable hiérarchique et requiert la signature de la direction.\n"+l+"Merci d'ouvrir le lien, de signer, puis de transmettre au service RH.\n\nCordialement,";
+  if(nextStep==="rh")
+    return "Bonjour,\n\nLa demande d'acompte de "+S.nom+" est signée (collaborateur, responsable, direction). Merci de compléter le cadre RH (réception, déblocage, reprise sur paie) et d'éditer le PDF définitif.\n"+l+"Cordialement,";
+  return l;
+}
+
+/* ---------- Export PDF ---------- */
+function exportPDF(){
+  readForm();
+  updateSocietePrint();
+  var doc=$("doc");
+  doc.classList.add("exporting");
+  var jsPDF=window.jspdf.jsPDF;
+  html2canvas(doc,{scale:2,backgroundColor:"#ffffff",useCORS:true}).then(function(canvas){
+    doc.classList.remove("exporting");
+    var pdf=new jsPDF("p","mm","a4");
+    var pw=pdf.internal.pageSize.getWidth();
+    var ph=pdf.internal.pageSize.getHeight();
+    var iw=pw;
+    var ih=canvas.height*iw/canvas.width;
+    var img=canvas.toDataURL("image/png");
+    if(ih<=ph){
+      pdf.addImage(img,"PNG",0,0,iw,ih);
+    }else{
+      var left=ih, pos=0;
+      while(left>0){
+        pdf.addImage(img,"PNG",0,pos,iw,ih);
+        left-=ph;
+        if(left>0){ pdf.addPage(); pos-=ph; }
+      }
+    }
+    var safe=(S.nom||"acompte").replace(/[^a-zA-Z0-9]+/g,"_");
+    pdf.save("Demande_acompte_"+safe+".pdf");
+  }).catch(function(){ doc.classList.remove("exporting"); alert("Erreur lors de l'export PDF."); });
+}
+
+/* ---------- Actions ---------- */
+function onPrimary(){
+  var step=S.step;
+  if(step==="collab"){
+    var e=validateCollab(); if(showErr(e))return;
+    openHandoff("resp", $("respEmail").value.trim(), "le responsable hiérarchique");
+  }else if(step==="resp"){
+    var e=validateResp(); if(showErr(e))return;
+    openHandoff("dir", DIR_EMAIL, "la direction (J. Deruy)");
+  }else if(step==="dir"){
+    var e=validateDir(); if(showErr(e))return;
+    openHandoff("rh", RH_EMAIL, "le service RH");
+  }else if(step==="rh"){
+    var e=validateRh(); if(showErr(e))return;
+    exportPDF();
+  }
+}
+
+/* ---------- Init ---------- */
+function init(){
+  if(loadFromHash()){ fillForm(); }
+  applyStep();
+
+  $("primaryBtn").addEventListener("click", onPrimary);
+  document.querySelectorAll("[data-clear]").forEach(function(b){
+    b.addEventListener("click", function(){ pads[b.getAttribute("data-clear")].clear(); });
+  });
+  $("resetBtn").addEventListener("click", function(){
+    if(confirm("Démarrer une nouvelle demande ? Les données en cours seront perdues.")){
+      location.href=location.href.split("#")[0];
+    }
+  });
+  $("copyBtn").addEventListener("click", function(){
+    var inp=$("modalLink"); inp.select();
+    try{ document.execCommand("copy"); }catch(e){}
+    if(navigator.clipboard) navigator.clipboard.writeText(inp.value).catch(function(){});
+    $("copiedMsg").classList.add("show");
+  });
+  $("closeModal").addEventListener("click", function(){ $("modal").classList.remove("show"); $("copiedMsg").classList.remove("show"); });
+
+  $("f_societe").addEventListener("change", updateSocietePrint);
+
+  // efface l'erreur à la saisie
+  document.addEventListener("input", function(){ $("errBox").classList.remove("show"); });
+}
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>
