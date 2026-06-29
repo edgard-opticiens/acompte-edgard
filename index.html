@@ -13,6 +13,7 @@
     --primary:#111111;
     --accent:#B0894C;
     --bullet:#B0894C;
+    --ink-fill:#B0894C;
     --ink:#1d1d1d;
     --muted:#666;
     --line:#bdbdbd;
@@ -101,6 +102,19 @@
   select.sel-line:focus{border-bottom-color:var(--primary);background-color:rgba(0,0,0,.02)}
   select.sel-line:disabled{border-bottom-style:solid;border-bottom-color:#e3e3e3;color:#222;background-image:none;opacity:1}
   .print-only{display:none;border-bottom:1.5px solid #e3e3e3;padding:1px 4px}
+  /* Saisies collaborateur en couleur de marque */
+  .fill-accent{color:var(--ink-fill)!important;font-weight:600}
+  select.sel-line.w-mois{min-width:118px}
+  select.sel-line.w-an{min-width:64px}
+  /* Champs date (calendrier natif) côté RH */
+  input.date-pick{
+    font:inherit;color:var(--ink);border:1px solid #d6d6d6;border-radius:7px;
+    background:#fff;padding:4px 8px;outline:none;
+  }
+  input.date-pick:focus{border-color:var(--primary)}
+  input.date-pick:disabled{background:#f4f4f4;color:#333;opacity:1}
+  /* Horodatage signatures */
+  .sig-ts{margin-top:6px;font-size:11px;font-weight:600;color:var(--primary);min-height:14px;text-align:center}
   .grow{flex:1}
   .w-nom{width:100%}
   .w-soc{width:100%}
@@ -190,6 +204,7 @@
   /* Export */
   #doc.exporting input.line,#doc.exporting input.date{border-bottom-color:transparent}
   #doc.exporting select.sel-line{display:none}
+  #doc.exporting input.date-pick{display:none}
   #doc.exporting .print-only{display:inline}
   #doc.exporting .sig-pad{border-color:transparent;background:#fff}
   #doc.exporting .sig-clear{display:none}
@@ -227,8 +242,8 @@
     <div class="card intro">
       <p class="fill"><span>Je, soussigné(e),&nbsp;</span><input class="line w-nom grow" id="f_nom" placeholder="Nom et prénom" autocomplete="off"></p>
       <p class="fill"><span>salarié(e) de la société&nbsp;</span><select class="sel-line grow" id="f_societe"><option value="">— Sélectionnez —</option><option>Edgard Développement</option><option>Ango</option><option>Biarro</option><option>Bordo</option><option>Caenpo</option><option>Giro</option><option>Havro</option><option>Jisam</option><option>Lyono</option><option>Manso</option><option>Marseillo</option><option>Nanceo</option><option>Nanto</option><option>Niceo</option><option>Orlo</option><option>Reimo</option><option>Strabo</option><option>Turo</option></select><span class="print-only" id="f_societe_print"></span></p>
-      <p class="fill"><span>sollicite le versement d'un acompte de&nbsp;</span><input class="line w-mt" id="f_montant" placeholder="montant" inputmode="decimal" autocomplete="off"><span>&nbsp;euros,</span></p>
-      <p class="fill"><span>sur mon salaire du mois de&nbsp;</span><input class="line w-mois" id="f_mois" placeholder="mois" autocomplete="off"><span>&nbsp;20</span><input class="line w-an" id="f_annee" placeholder="26" maxlength="2" inputmode="numeric" autocomplete="off"><span>&nbsp;.</span></p>
+      <p class="fill"><span>sollicite le versement d'un acompte de&nbsp;</span><input class="line w-mt fill-accent" id="f_montant" placeholder="montant" inputmode="decimal" autocomplete="off"><span>&nbsp;euros,</span></p>
+      <p class="fill"><span>sur mon salaire du mois de&nbsp;</span><select class="sel-line fill-accent w-mois" id="f_mois"><option value="">— mois —</option><option>Janvier</option><option>Février</option><option>Mars</option><option>Avril</option><option>Mai</option><option>Juin</option><option>Juillet</option><option>Août</option><option>Septembre</option><option>Octobre</option><option>Novembre</option><option>Décembre</option></select><span class="print-only fill-accent" id="f_mois_print"></span><span class="fill-accent">&nbsp;20</span><select class="sel-line fill-accent w-an" id="f_annee"><option value="">—</option><option>25</option><option>26</option><option>27</option><option>28</option><option>29</option><option>30</option></select><span class="print-only fill-accent" id="f_annee_print"></span><span>&nbsp;.</span></p>
 
       <div class="notes">
         <span class="nt-title">J'ai pris note que :</span>
@@ -246,21 +261,21 @@
         <div class="col">
           <div class="role">Salarié(e)</div>
           <div class="sub">&nbsp;</div>
-          <div class="date-row"><label>Date</label><input class="date" id="f_dateCollab" placeholder="jj/mm/aaaa" autocomplete="off"></div>
           <div class="sig-wrap">
             <div class="sig-label">Signature</div>
             <div class="sig-pad" id="pad_collab"><span class="ph">Signez ici</span></div>
             <button class="sig-clear" type="button" data-clear="collab">Effacer</button>
+            <div class="sig-ts" id="ts_collab"></div>
           </div>
         </div>
         <div class="col">
           <div class="role">Responsable hiérarchique</div>
-          <div class="sub">(à titre d'information)</div>
-          <div class="date-row"><label>Date</label><input class="date" id="f_dateResp" placeholder="jj/mm/aaaa" autocomplete="off"></div>
+          <div class="sub">&nbsp;</div>
           <div class="sig-wrap">
             <div class="sig-label">Signature</div>
             <div class="sig-pad" id="pad_resp"><span class="ph">Signez ici</span></div>
             <button class="sig-clear" type="button" data-clear="resp">Effacer</button>
+            <div class="sig-ts" id="ts_resp"></div>
           </div>
         </div>
       </div>
@@ -270,21 +285,22 @@
       <div class="sec-title">Cadre réservé au service RH</div>
       <div class="rh-row">
         <b>Reçu service RH le :</b>
-        <input class="date" id="f_recuLe" placeholder="jj/mm/aaaa" autocomplete="off">
+        <input type="date" class="date-pick" id="f_recuLe"><span class="print-only" id="f_recuLe_print"></span>
         <b>&nbsp;&nbsp;déblocage / virement le :</b>
-        <input class="date" id="f_deblocageLe" placeholder="jj/mm/aaaa" autocomplete="off">
+        <input type="date" class="date-pick" id="f_deblocageLe"><span class="print-only" id="f_deblocageLe_print"></span>
       </div>
       <div class="rh-row">
         <b>Reprise sur paie du mois de :</b>
-        <input class="date" id="f_repriseMois" placeholder="mm/aaaa" autocomplete="off">
+        <select class="sel-line" id="f_repriseMois"><option value="">— mois —</option><option>Janvier</option><option>Février</option><option>Mars</option><option>Avril</option><option>Mai</option><option>Juin</option><option>Juillet</option><option>Août</option><option>Septembre</option><option>Octobre</option><option>Novembre</option><option>Décembre</option></select><span class="print-only" id="f_repriseMois_print"></span>
+        <select class="sel-line" id="f_repriseAnnee"><option value="">— année —</option><option>2025</option><option>2026</option><option>2027</option><option>2028</option><option>2029</option><option>2030</option></select><span class="print-only" id="f_repriseAnnee_print"></span>
       </div>
       <div class="rh-grid-sig">
         <div class="col">
-          <div class="role" style="font-size:13px">Signature du dirigeant</div>
-          <div class="date-row"><label>Date</label><input class="date" id="f_dateDir" placeholder="jj/mm/aaaa" autocomplete="off"></div>
+          <div class="role" style="font-size:13px">Signature de la direction</div>
           <div class="sig-wrap">
             <div class="sig-pad" id="pad_dir"><span class="ph">Signez ici</span></div>
             <button class="sig-clear" type="button" data-clear="dir">Effacer</button>
+            <div class="sig-ts" id="ts_dir"></div>
           </div>
         </div>
       </div>
@@ -335,9 +351,9 @@ var STEP_LABEL = {collab:"Collaborateur", resp:"Responsable hiérarchique", dir:
 /* ---------- Etat ---------- */
 var S = {
   nom:"", societe:"", montant:"", mois:"", annee:"",
-  dateCollab:"", dateResp:"", dateDir:"",
-  recuLe:"", deblocageLe:"", repriseMois:"",
+  recuLe:"", deblocageLe:"", repriseMois:"", repriseAnnee:"",
   sigCollab:null, sigResp:null, sigDir:null,
+  tsCollab:null, tsResp:null, tsDir:null,
   step:"collab"
 };
 
@@ -387,7 +403,11 @@ SigPad.prototype.up=function(){
   this.curStroke=null; this.cur=null;
 };
 SigPad.prototype.persist=function(){
-  S["sig"+cap(this.id)] = this.strokes.length?JSON.stringify(this.strokes):null;
+  var k=cap(this.id);
+  var has=this.strokes.length>0;
+  S["sig"+k] = has?JSON.stringify(this.strokes):null;
+  S["ts"+k]  = has ? (S["ts"+k] || nowStamp()) : null;
+  renderTs(this.id);
   this.render(false);
 };
 SigPad.prototype.render=function(live){
@@ -423,25 +443,49 @@ var pads={ collab:new SigPad("collab"), resp:new SigPad("resp"), dir:new SigPad(
 
 /* ---------- Helpers DOM ---------- */
 function $(id){return document.getElementById(id);}
-var FIELDS=["nom","societe","montant","mois","annee","dateCollab","dateResp","dateDir","recuLe","deblocageLe","repriseMois"];
+var FIELDS=["nom","societe","montant","mois","annee","recuLe","deblocageLe","repriseMois","repriseAnnee"];
 function readForm(){
   FIELDS.forEach(function(k){ S[k]=$("f_"+k).value.trim(); });
 }
 function fillForm(){
   FIELDS.forEach(function(k){ $("f_"+k).value = S[k]||""; });
-  updateSocietePrint();
+  updatePrints();
   pads.collab.load(S.sigCollab);
   pads.resp.load(S.sigResp);
   pads.dir.load(S.sigDir);
+  ["collab","resp","dir"].forEach(renderTs);
 }
-function updateSocietePrint(){
-  $("f_societe_print").textContent = $("f_societe").value || "";
+/* Miroirs texte pour l'export PDF (selects + champs date) */
+function setP(id,v){ var el=$(id); if(el) el.textContent=v||""; }
+function fmtDate(v){
+  var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(v||"");
+  return m ? (m[3]+"/"+m[2]+"/"+m[1]) : (v||"");
+}
+function updatePrints(){
+  setP("f_societe_print", $("f_societe").value);
+  setP("f_mois_print", $("f_mois").value);
+  setP("f_annee_print", $("f_annee").value);
+  setP("f_recuLe_print", fmtDate($("f_recuLe").value));
+  setP("f_deblocageLe_print", fmtDate($("f_deblocageLe").value));
+  setP("f_repriseMois_print", $("f_repriseMois").value);
+  setP("f_repriseAnnee_print", $("f_repriseAnnee").value);
+}
+
+/* ---------- Horodatage ---------- */
+function nowStamp(){
+  var d=new Date(), p=function(n){return (n<10?"0":"")+n;};
+  return p(d.getDate())+"/"+p(d.getMonth()+1)+"/"+d.getFullYear()+" à "+p(d.getHours())+":"+p(d.getMinutes());
+}
+function renderTs(id){
+  var el=$("ts_"+id); if(!el) return;
+  var ts=S["ts"+cap(id)];
+  el.textContent = ts ? ("Signé le "+ts) : "";
 }
 
 /* ---------- Dates ---------- */
-function today(){
+function todayISO(){
   var d=new Date(), p=function(n){return (n<10?"0":"")+n;};
-  return p(d.getDate())+"/"+p(d.getMonth()+1)+"/"+d.getFullYear();
+  return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate());
 }
 function validDate(v){ return /^\d{2}\/\d{2}\/\d{4}$/.test(v); }
 function validMonth(v){ return /^\d{2}\/\d{4}$/.test(v); }
@@ -480,25 +524,19 @@ function applyStep(){
       editDir=(step==="dir"), editRh=(step==="rh");
 
   // Champs collaborateur
-  ["nom","montant","mois","annee"].forEach(function(k){ $("f_"+k).readOnly=!editCollab; });
-  $("f_societe").disabled=!editCollab;
-  $("f_dateCollab").readOnly=!editCollab; $("f_dateCollab").disabled=!editCollab;
-  // dates
-  $("f_dateResp").readOnly=!editResp; $("f_dateResp").disabled=!editResp;
-  $("f_dateDir").readOnly=!editDir;   $("f_dateDir").disabled=!editDir;
-  ["recuLe","deblocageLe","repriseMois"].forEach(function(k){
-    $("f_"+k).readOnly=!editRh; $("f_"+k).disabled=!editRh;
+  ["nom","montant"].forEach(function(k){ $("f_"+k).readOnly=!editCollab; });
+  ["societe","mois","annee"].forEach(function(k){ $("f_"+k).disabled=!editCollab; });
+  // Champs RH
+  ["recuLe","deblocageLe","repriseMois","repriseAnnee"].forEach(function(k){
+    $("f_"+k).disabled=!editRh;
   });
 
   pads.collab.setEditable(editCollab);
   pads.resp.setEditable(editResp);
   pads.dir.setEditable(editDir);
 
-  // pré-remplissage date du jour à l'arrivée de l'acteur
-  if(editCollab && !$("f_dateCollab").value) $("f_dateCollab").value=today();
-  if(editResp && !$("f_dateResp").value) $("f_dateResp").value=today();
-  if(editDir && !$("f_dateDir").value) $("f_dateDir").value=today();
-  if(editRh && !$("f_recuLe").value) $("f_recuLe").value=today();
+  // pré-remplissage de la date de réception RH (calendrier) à l'arrivée du RH
+  if(editRh && !$("f_recuLe").value) $("f_recuLe").value=todayISO();
 
   // bouton + champ responsable
   $("respField").classList.toggle("show", editCollab);
@@ -525,8 +563,7 @@ function validateCollab(){
   if(!S.societe) e.push("Société");
   if(!S.montant) e.push("Montant de l'acompte");
   if(!S.mois) e.push("Mois du salaire");
-  if(!S.annee || S.annee.length<2) e.push("Année (2 chiffres)");
-  if(!validDate(S.dateCollab)) e.push("Date (format jj/mm/aaaa)");
+  if(!S.annee) e.push("Année du salaire");
   if(!S.sigCollab) e.push("Signature du salarié");
   var email=$("respEmail").value.trim();
   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) e.push("Email du responsable hiérarchique");
@@ -534,21 +571,20 @@ function validateCollab(){
 }
 function validateResp(){
   readForm(); var e=[];
-  if(!validDate(S.dateResp)) e.push("Date (format jj/mm/aaaa)");
   if(!S.sigResp) e.push("Signature du responsable");
   return e;
 }
 function validateDir(){
   readForm(); var e=[];
-  if(!validDate(S.dateDir)) e.push("Date (format jj/mm/aaaa)");
-  if(!S.sigDir) e.push("Signature du dirigeant");
+  if(!S.sigDir) e.push("Signature de la direction");
   return e;
 }
 function validateRh(){
   readForm(); var e=[];
-  if(!validDate(S.recuLe)) e.push("Date de réception RH (jj/mm/aaaa)");
-  if(!validDate(S.deblocageLe)) e.push("Date de déblocage / virement (jj/mm/aaaa)");
-  if(!validMonth(S.repriseMois)) e.push("Mois de reprise sur paie (mm/aaaa)");
+  if(!S.recuLe) e.push("Date de réception RH");
+  if(!S.deblocageLe) e.push("Date de déblocage / virement");
+  if(!S.repriseMois) e.push("Mois de reprise sur paie");
+  if(!S.repriseAnnee) e.push("Année de reprise sur paie");
   return e;
 }
 
@@ -601,7 +637,7 @@ function mailBody(nextStep, link){
 /* ---------- Export PDF ---------- */
 function exportPDF(){
   readForm();
-  updateSocietePrint();
+  updatePrints();
   var doc=$("doc");
   doc.classList.add("exporting");
   var jsPDF=window.jspdf.jsPDF;
@@ -668,7 +704,7 @@ function init(){
   });
   $("closeModal").addEventListener("click", function(){ $("modal").classList.remove("show"); $("copiedMsg").classList.remove("show"); });
 
-  $("f_societe").addEventListener("change", updateSocietePrint);
+  document.addEventListener("change", updatePrints);
 
   // efface l'erreur à la saisie
   document.addEventListener("input", function(){ $("errBox").classList.remove("show"); });
