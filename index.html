@@ -324,6 +324,16 @@
   </div>
 </div>
 
+<div class="modal" id="introModal">
+  <div class="box">
+    <h3>Avant de commencer</h3>
+    <p>Avant de compléter cette demande d'acompte, rapprochez-vous de votre <strong>directeur</strong> afin de déterminer, avec le <strong>service RH</strong>, le montant d'acompte auquel vous pouvez prétendre.</p>
+    <div class="acts">
+      <button class="btn" id="introOk" type="button">J'ai compris</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="modal">
   <div class="box">
     <h3 id="modalTitle">Lien généré</h3>
@@ -687,6 +697,9 @@ function init(){
   if(loadFromHash()){ fillForm(); }
   applyStep();
 
+  // Rappel affiché uniquement au collaborateur (étape 1)
+  if(S.step==="collab"){ $("introModal").classList.add("show"); }
+  $("introOk").addEventListener("click", function(){ $("introModal").classList.remove("show"); });
   $("primaryBtn").addEventListener("click", onPrimary);
   document.querySelectorAll("[data-clear]").forEach(function(b){
     b.addEventListener("click", function(){ pads[b.getAttribute("data-clear")].clear(); });
