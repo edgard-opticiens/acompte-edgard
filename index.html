@@ -611,6 +611,20 @@ function shorten(longUrl){
     });
 }
 
+/* ---------- Suivi tableau de bord RH ---------- */
+var ACOMPTE_LOG_WEBHOOK="https://edgard-opticiens.app.n8n.cloud/webhook/log-acompte";
+function acCle(){
+  return (S.societe||"").toUpperCase().replace(/[^A-Z0-9]+/g,"_")+"_"+
+         (S.nom||"").toUpperCase().replace(/[^A-Z0-9]+/g,"_")+"_"+
+         (S.mois||"")+"-"+(S.annee||"");
+}
+function acLog(etape){
+  try{
+    fetch(ACOMPTE_LOG_WEBHOOK,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({cle:acCle(),societe:S.societe,nom:S.nom,montant:S.montant,etape:etape})}).catch(function(){});
+  }catch(e){}
+}
+
 /* ---------- Modal / mailto ---------- */
 function buildLongUrl(nextStep){
   S.step=nextStep;
@@ -618,6 +632,7 @@ function buildLongUrl(nextStep){
   return base+"#"+encodeState();
 }
 function openHandoff(nextStep, to, who){
+  acLog(nextStep);
   var longUrl=buildLongUrl(nextStep);
   var btn=$("primaryBtn"); btn.disabled=true; btn.textContent="Génération du lien…";
   shorten(longUrl).then(function(link){
@@ -646,6 +661,7 @@ function mailBody(nextStep, link){
 
 /* ---------- Export PDF ---------- */
 function exportPDF(){
+  acLog("termine");
   readForm();
   updatePrints();
   var doc=$("doc");
