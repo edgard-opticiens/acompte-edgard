@@ -364,6 +364,7 @@ var S = {
   recuLe:"", deblocageLe:"", repriseMois:"", repriseAnnee:"",
   sigCollab:null, sigResp:null, sigDir:null,
   tsCollab:null, tsResp:null, tsDir:null,
+  nonce:null,
   step:"collab"
 };
 
@@ -614,9 +615,17 @@ function shorten(longUrl){
 /* ---------- Suivi tableau de bord RH ---------- */
 var ACOMPTE_LOG_WEBHOOK="https://edgard-opticiens.app.n8n.cloud/webhook/log-acompte";
 function acCle(){
+  // Nonce anti-collision : genere une seule fois par demande (a la premiere transmission) et
+  // conserve dans l'etat (donc dans le lien) pour toute la suite du circuit. Sans cela, deux
+  // demandes distinctes du meme salarie pour le meme mois/annee calculaient la MEME cle et la
+  // seconde ecrasait silencieusement la premiere dans le suivi (meme defaut que sur l'outil
+  // congés-payés, corrige le 2026-10-13).
+  if(!S.nonce){
+    S.nonce=(window.crypto&&crypto.randomUUID)?crypto.randomUUID().replace(/-/g,"").slice(0,10):(Date.now().toString(36)+Math.random().toString(36).slice(2,8));
+  }
   return (S.societe||"").toUpperCase().replace(/[^A-Z0-9]+/g,"_")+"_"+
          (S.nom||"").toUpperCase().replace(/[^A-Z0-9]+/g,"_")+"_"+
-         (S.mois||"")+"-"+(S.annee||"");
+         (S.mois||"")+"-"+(S.annee||"")+"_"+S.nonce;
 }
 function acLog(etape){
   try{
