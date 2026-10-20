@@ -355,6 +355,11 @@
 /* ---------- Config workflow ---------- */
 var DIR_EMAIL = "j.deruy@groupe-edgard.com";          // Direction
 var RH_EMAIL  = "ressources-humaines@groupe-edgard.com"; // Service RH
+// Lien court + envoi mail automatique (ajouté le 2026-10-20, même backend que heures sup/congés)
+var LIENCOURT_SAVE="https://edgard-opticiens.app.n8n.cloud/webhook/lien-court-save";
+var LIENCOURT_GET="https://edgard-opticiens.app.n8n.cloud/webhook/lien-court-get";
+var MAIL_WEBHOOK="https://edgard-opticiens.app.n8n.cloud/webhook/envoi-mail-conges";
+var BRAND={acc:"#C9A84C",accD:"#A97A2E",soft:"#F6EFD9",nom:"EDGARD",txt:"#1A1A1A"};
 var ORDER = ["collab","resp","dir","rh"];
 var STEP_LABEL = {collab:"Collaborateur", resp:"Responsable hiérarchique", dir:"Direction", rh:"Service RH"};
 
@@ -518,6 +523,20 @@ function loadFromHash(){
     return true;
   }catch(e){ return false; }
 }
+// Lien court (?s=xxxxxxxx) : charge l'état depuis le backend au lieu du hash LZString.
+// cb(true/false) est appelé une fois la tentative terminée (toujours, succès ou échec).
+function loadFromShortLink(cb){
+  var q=new URLSearchParams(location.search), s=q.get("s");
+  if(!s || !/^[a-z2-9]{8}$/.test(s)){ cb(false); return false; }
+  fetch(LIENCOURT_GET+"?id="+encodeURIComponent(s)).then(function(r){return r.json()})
+    .then(function(res){
+      if(res&&res.ok&&res.data&&typeof res.data==="object"){
+        Object.keys(res.data).forEach(function(k){ S[k]=res.data[k]; });
+        cb(true);
+      }else{ cb(false); }
+    }).catch(function(){ cb(false); });
+  return true;
+}
 
 /* ---------- Application de l'étape ---------- */
 function applyStep(){
@@ -600,16 +619,19 @@ function validateRh(){
 }
 
 /* ---------- Lien court ---------- */
-function shorten(longUrl){
-  return fetch("https://is.gd/create.php?format=simple&logstats=0&url="+encodeURIComponent(longUrl))
-    .then(function(r){ return r.ok?r.text():Promise.reject(); })
-    .then(function(t){ t=(t||"").trim(); if(t.indexOf("http")===0) return t; throw 0; })
-    .catch(function(){
-      return fetch("https://tinyurl.com/api-create.php?url="+encodeURIComponent(longUrl))
-        .then(function(r){ return r.ok?r.text():Promise.reject(); })
-        .then(function(t){ t=(t||"").trim(); if(t.indexOf("http")===0) return t; throw 0; })
-        .catch(function(){ return longUrl; });
-    });
+// Remplace l'ancien raccourcisseur is.gd/TinyURL (souvent en échec -> lien long illisible dans le
+// mail) par le système de lien court interne déjà utilisé pour les heures sup et congés payés.
+function shortLinkAcompte(nextStep,cb){
+  var longUrl=buildLongUrl(nextStep); // fixe S.step=nextStep et sert de repli si le lien court échoue
+  var done=false,to=setTimeout(function(){if(!done){done=true;cb(longUrl);}},12000);
+  fetch(LIENCOURT_SAVE,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({data:S})})
+    .then(function(r){return r.json()})
+    .then(function(res){
+      if(done)return;done=true;clearTimeout(to);
+      var base=location.href.split("#")[0].split("?")[0];
+      cb(res&&res.ok&&res.cle?base+"?s="+res.cle:longUrl);
+    })
+    .catch(function(){if(done)return;done=true;clearTimeout(to);cb(longUrl);});
 }
 
 /* ---------- Suivi tableau de bord RH ---------- */
@@ -642,19 +664,30 @@ function buildLongUrl(nextStep){
 }
 function openHandoff(nextStep, to, who){
   acLog(nextStep);
-  var longUrl=buildLongUrl(nextStep);
   var btn=$("primaryBtn"); btn.disabled=true; btn.textContent="Génération du lien…";
-  shorten(longUrl).then(function(link){
+  shortLinkAcompte(nextStep, function(link){
     var subject="Demande d'acompte sur salaire – "+S.nom+(S.societe?(" ("+S.societe+")"):"");
-    var body=mailBody(nextStep, link);
+    var body=mailBody(nextStep, link); // version texte, utilisée seulement par le bouton de secours mailto
     $("modalTitle").textContent="Lien pour "+who;
-    $("modalText").textContent="Transmettez ce lien à "+who+". Il rouvre la demande à l'étape suivante.";
     $("modalLink").value=link;
+    $("mailBtn").style.display="none";
     $("mailBtn").onclick=function(){
       window.location.href="mailto:"+(to||"")+"?subject="+encodeURIComponent(subject)+"&body="+encodeURIComponent(body);
     };
     $("modal").classList.add("show");
     btn.disabled=false; applyStep();
+    $("modalText").textContent="Envoi du mail à "+to+" en cours…";
+    fetch(MAIL_WEBHOOK,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({to:to,subject:subject,body:mailBodyHtml(nextStep,link,who)})})
+      .then(function(r){return r.json().then(function(j){return !!(r.ok&&j&&j.ok)},function(){return false})})
+      .then(function(ok){
+        if(!ok)throw 0;
+        $("modalText").textContent="✅ Mail envoyé à "+to+".";
+      })
+      .catch(function(){
+        $("modalText").textContent="⚠️ L'envoi automatique a échoué. Cliquez sur « Ouvrir l'email » ou copiez le lien ci-dessous. Destinataire : "+to;
+        $("mailBtn").style.display="";
+      });
   });
 }
 function mailBody(nextStep, link){
@@ -666,6 +699,31 @@ function mailBody(nextStep, link){
   if(nextStep==="rh")
     return "Bonjour,\n\nLa demande d'acompte de "+S.nom+" est signée (collaborateur, responsable, direction). Merci de compléter le cadre RH (réception, déblocage, reprise sur paie) et d'éditer le PDF définitif.\n"+l+"Cordialement,";
   return l;
+}
+/* ---------- Mail habillé (HTML, envoyé via MAIL_WEBHOOK) ---------- */
+function escHtml(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+function infoRowHtml(l,v){return '<tr><td style="padding:4px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#666666;width:150px;">'+l+'</td><td style="padding:4px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#1A1A1A;font-weight:700;">'+v+'</td></tr>';}
+function mailBodyHtml(nextStep, link, who){
+  var titre,texte,cta;
+  if(nextStep==="resp"){titre="Validation à effectuer";texte="Un(e) collaborateur(trice) a déposé une demande d'acompte sur salaire et sollicite votre validation en tant que <strong>responsable hiérarchique</strong>.";cta="Consulter et signer →";}
+  else if(nextStep==="dir"){titre="Signature de la Direction";texte="La demande d'acompte a été validée par le responsable hiérarchique et requiert la signature de la <strong>Direction</strong>.";cta="Consulter et signer →";}
+  else{titre="Dossier à compléter";texte="La demande d'acompte est signée (collaborateur, responsable, direction). Merci de compléter le cadre RH (réception, déblocage, reprise sur paie) et d'éditer le PDF définitif.";cta="Ouvrir et compléter →";}
+  var rows=infoRowHtml('Collaborateur',escHtml(S.nom))+(S.societe?infoRowHtml('Société',escHtml(S.societe)):'')+(S.montant?infoRowHtml('Montant',escHtml(S.montant)+' €'):'');
+  var href=escHtml(link);
+  return ' <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F2EFE8;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;"><tr><td align="center">'+
+   '<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border-radius:10px;overflow:hidden;">'+
+   '<tr><td style="background:'+BRAND.acc+';padding:20px 32px;"><span style="font-family:Georgia,\'Times New Roman\',serif;color:'+BRAND.txt+';font-size:20px;font-weight:700;letter-spacing:.03em;">'+BRAND.nom+'</span>'+
+   '<span style="font-family:Arial,Helvetica,sans-serif;color:'+BRAND.txt+';opacity:.85;font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin-left:10px;">Ressources Humaines</span></td></tr>'+
+   '<tr><td style="padding:32px 32px 28px;">'+
+   '<p style="margin:0 0 6px;font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:'+BRAND.accD+';">Acompte sur salaire</p>'+
+   '<h1 style="margin:0 0 16px;font-family:Georgia,\'Times New Roman\',serif;font-size:22px;font-weight:700;color:#1A1A1A;">'+titre+'</h1>'+
+   '<p style="margin:0 0 14px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#333333;">'+texte+'</p>'+
+   '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:'+BRAND.soft+';border-radius:8px;padding:10px 14px;margin:6px 0 0;"><tr><td style="padding:8px 14px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">'+rows+'</table></td></tr></table>'+
+   '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:26px 0 6px;"><tr><td bgcolor="'+BRAND.acc+'" style="border-radius:6px;"><a href="'+href+'" style="display:inline-block;padding:13px 26px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:700;color:'+BRAND.txt+';text-decoration:none;">'+cta+'</a></td></tr></table>'+
+   '<p style="margin:8px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#999999;">Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur&nbsp;:<br><a href="'+href+'" style="color:'+BRAND.accD+';word-break:break-all;">'+href+'</a></p>'+
+   '</td></tr>'+
+   '<tr><td style="padding:16px 32px;background:#F9F7F2;border-top:1px solid #E0DCD0;"><p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#999999;">Envoi automatique — merci de ne pas répondre à cet e-mail.</p></td></tr>'+
+   '</table></td></tr></table>';
 }
 
 /* ---------- Export PDF ---------- */
@@ -718,12 +776,15 @@ function onPrimary(){
 }
 
 /* ---------- Init ---------- */
-function init(){
-  if(loadFromHash()){ fillForm(); }
+function finishInit(loaded){
+  if(loaded){ fillForm(); }
   applyStep();
-
   // Rappel affiché uniquement au collaborateur (étape 1)
   if(S.step==="collab"){ $("introModal").classList.add("show"); }
+}
+function init(){
+  if(!loadFromShortLink(finishInit)){ finishInit(loadFromHash()); }
+
   $("introOk").addEventListener("click", function(){ $("introModal").classList.remove("show"); });
   $("primaryBtn").addEventListener("click", onPrimary);
   document.querySelectorAll("[data-clear]").forEach(function(b){
