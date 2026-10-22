@@ -662,6 +662,29 @@ function buildLongUrl(nextStep){
   var base=location.href.split("#")[0];
   return base+"#"+encodeState();
 }
+// Envoi du mail de transmission avec timeout + 1 nouvelle tentative : sans ca, un fetch()
+// qui reste bloque (ex. telephone mis en veille / onglet mis en arriere-plan pendant l'envoi
+// sur mobile) ne declenche NI le .then NI le .catch, et le bandeau "Envoi du mail en cours..."
+// reste affiche indefiniment sans jamais montrer le repli manuel "Ouvrir l'email" -- la
+// personne quitte alors la page en pensant que l'envoi a reussi, et le destinataire ne recoit
+// rien (meme defaut corrige sur l'outil heures sup, 2026-10-22). Meme principe que le timeout
+// deja utilise dans shortLinkAcompte() ci-dessus.
+function envoyerMailAcompte(payload,tentative,cb){
+  var done=false,to=setTimeout(function(){
+    if(done)return;done=true;
+    if(tentative<1){envoyerMailAcompte(payload,tentative+1,cb);}else{cb(false);}
+  },10000);
+  fetch(MAIL_WEBHOOK,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)})
+    .then(function(r){return r.json().then(function(j){return !!(r.ok&&j&&j.ok)},function(){return false})})
+    .then(function(ok){
+      if(done)return;done=true;clearTimeout(to);
+      if(ok){cb(true);}else if(tentative<1){envoyerMailAcompte(payload,tentative+1,cb);}else{cb(false);}
+    })
+    .catch(function(){
+      if(done)return;done=true;clearTimeout(to);
+      if(tentative<1){envoyerMailAcompte(payload,tentative+1,cb);}else{cb(false);}
+    });
+}
 function openHandoff(nextStep, to, who){
   acLog(nextStep);
   var btn=$("primaryBtn"); btn.disabled=true; btn.textContent="Génération du lien…";
@@ -677,17 +700,14 @@ function openHandoff(nextStep, to, who){
     $("modal").classList.add("show");
     btn.disabled=false; applyStep();
     $("modalText").textContent="Envoi du mail à "+to+" en cours…";
-    fetch(MAIL_WEBHOOK,{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({to:to,subject:subject,body:mailBodyHtml(nextStep,link,who)})})
-      .then(function(r){return r.json().then(function(j){return !!(r.ok&&j&&j.ok)},function(){return false})})
-      .then(function(ok){
-        if(!ok)throw 0;
+    envoyerMailAcompte({to:to,subject:subject,body:mailBodyHtml(nextStep,link,who)},0,function(ok){
+      if(ok){
         $("modalText").textContent="✅ Mail envoyé à "+to+".";
-      })
-      .catch(function(){
+      }else{
         $("modalText").textContent="⚠️ L'envoi automatique a échoué. Cliquez sur « Ouvrir l'email » ou copiez le lien ci-dessous. Destinataire : "+to;
         $("mailBtn").style.display="";
-      });
+      }
+    });
   });
 }
 function mailBody(nextStep, link){
